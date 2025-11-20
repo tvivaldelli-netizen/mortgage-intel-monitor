@@ -24,3 +24,15 @@ args = "node index.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[ports]]
+localPort = 5173
+externalPort = 80
+
+[[ports]]
+localPort = 3001
+externalPort = 3001
+
+[deployment]
+run = ["sh", "-c", "cd client && npm run dev"]
+deploymentTarget = "cloudrun"

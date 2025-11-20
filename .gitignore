@@ -1,4 +1,37 @@
+# Dependencies
 node_modules/
-npm-debug.log
+package-lock.json
+
+# Environment variables
 .env
+.env.local
+.env.production
+
+# Build output
+dist/
+build/
 *.log
+npm-debug.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Replit
+.replit
+replit.nix
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+*.bak
+.cache/

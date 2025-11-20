@@ -1,0 +1,24 @@
+{
+  "sources": [
+    {
+      "name": "HousingWire",
+      "url": "https://www.housingwire.com/",
+      "rss": "https://www.housingwire.com/feed/"
+    },
+    {
+      "name": "National Mortgage News",
+      "url": "https://www.nationalmortgagenews.com/",
+      "rss": "https://www.nationalmortgagenews.com/feed"
+    },
+    {
+      "name": "Mortgage News Daily",
+      "url": "https://www.mortgagenewsdaily.com/",
+      "rss": "https://www.mortgagenewsdaily.com/rss/latest-news"
+    },
+    {
+      "name": "FinTech Magazine",
+      "url": "https://fintechmagazine.com/",
+      "rss": "https://fintechmagazine.com/feed"
+    }
+  ]
+}
