@@ -27,6 +27,8 @@ export async function saveArticle(article) {
     const verify = await db.get(articleId);
     if (!verify) {
       console.error(`[DB] ERROR: Failed to save article ${articleId}`);
+    } else {
+      console.log(`[DB] ✓ Article saved: ${articleId}`);
     }
   } catch (error) {
     console.error(`[DB] Exception saving article ${articleId}:`, error.message);
@@ -36,7 +38,12 @@ export async function saveArticle(article) {
   const articleIds = await getArticleIds();
   if (!articleIds.includes(article.link)) {
     articleIds.push(article.link);
-    await db.set('articleIds', articleIds);
+    try {
+      await db.set('articleIds', JSON.stringify(articleIds));
+      console.log(`[DB] Updated article list (${articleIds.length} articles)`);
+    } catch (error) {
+      console.error(`[DB] Error updating article list:`, error.message);
+    }
   }
 
   return articleData;
@@ -46,8 +53,19 @@ export async function saveArticle(article) {
  * Get list of all article IDs
  */
 async function getArticleIds() {
-  const ids = await db.get('articleIds');
-  return ids || [];
+  try {
+    const idsJson = await db.get('articleIds');
+    if (!idsJson) return [];
+    
+    // Handle both string and already-parsed formats
+    if (typeof idsJson === 'string') {
+      return JSON.parse(idsJson);
+    }
+    return Array.isArray(idsJson) ? idsJson : [];
+  } catch (error) {
+    console.error(`[DB] Error retrieving article IDs:`, error.message);
+    return [];
+  }
 }
 
 /**
@@ -55,75 +73,93 @@ async function getArticleIds() {
  * @param {Object} filters - { source, startDate, endDate, keyword }
  */
 export async function getArticles(filters = {}) {
-  const articleIds = await getArticleIds();
-  const articles = [];
+  try {
+    const articleIds = await getArticleIds();
+    const articles = [];
 
-  for (const link of articleIds) {
-    const articleJson = await db.get(`article:${link}`);
-    if (articleJson) {
-      try {
-        const article = JSON.parse(articleJson);
-        articles.push(article);
-      } catch (error) {
-        console.error(`[DB] Error parsing article ${link}:`, error.message);
+    for (const link of articleIds) {
+      const articleJson = await db.get(`article:${link}`);
+      if (articleJson) {
+        try {
+          // Handle both string and already-parsed formats
+          const article = typeof articleJson === 'string' ? JSON.parse(articleJson) : articleJson;
+          articles.push(article);
+        } catch (error) {
+          console.error(`[DB] Error parsing article ${link}:`, error.message);
+        }
       }
     }
+
+    let filtered = articles;
+
+    // Apply filters
+    if (filters.source) {
+      filtered = filtered.filter(a => a.source === filters.source);
+    }
+
+    if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      startDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(a => new Date(a.pubDate) >= startDate);
+    }
+
+    if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(a => new Date(a.pubDate) <= endDate);
+    }
+
+    if (filters.keyword) {
+      const keyword = filters.keyword.toLowerCase();
+      filtered = filtered.filter(a =>
+        a.title.toLowerCase().includes(keyword) ||
+        (a.summary && a.summary.toLowerCase().includes(keyword))
+      );
+    }
+
+    // Sort by date, newest first
+    filtered.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+
+    return filtered;
+  } catch (error) {
+    console.error(`[DB] Error retrieving articles:`, error.message);
+    return [];
   }
-
-  let filtered = articles;
-
-  // Apply filters
-  if (filters.source) {
-    filtered = filtered.filter(a => a.source === filters.source);
-  }
-
-  if (filters.startDate) {
-    const startDate = new Date(filters.startDate);
-    startDate.setHours(0, 0, 0, 0);
-    filtered = filtered.filter(a => new Date(a.pubDate) >= startDate);
-  }
-
-  if (filters.endDate) {
-    const endDate = new Date(filters.endDate);
-    endDate.setHours(23, 59, 59, 999);
-    filtered = filtered.filter(a => new Date(a.pubDate) <= endDate);
-  }
-
-  if (filters.keyword) {
-    const keyword = filters.keyword.toLowerCase();
-    filtered = filtered.filter(a =>
-      a.title.toLowerCase().includes(keyword) ||
-      (a.summary && a.summary.toLowerCase().includes(keyword))
-    );
-  }
-
-  // Sort by date, newest first
-  filtered.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-
-  return filtered;
 }
 
 /**
  * Clear old articles (older than 90 days)
  */
 export async function cleanOldArticles() {
-  const articleIds = await getArticleIds();
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  try {
+    const articleIds = await getArticleIds();
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  const updatedIds = [];
+    const updatedIds = [];
 
-  for (const link of articleIds) {
-    const article = await db.get(`article:${link}`);
-    if (article && new Date(article.pubDate) >= ninetyDaysAgo) {
-      updatedIds.push(link);
-    } else {
-      await db.delete(`article:${link}`);
+    for (const link of articleIds) {
+      const articleJson = await db.get(`article:${link}`);
+      if (articleJson) {
+        try {
+          const article = typeof articleJson === 'string' ? JSON.parse(articleJson) : articleJson;
+          if (new Date(article.pubDate) >= ninetyDaysAgo) {
+            updatedIds.push(link);
+          } else {
+            await db.delete(`article:${link}`);
+          }
+        } catch (error) {
+          console.error(`[DB] Error processing article ${link}:`, error.message);
+        }
+      }
     }
-  }
 
-  await db.set('articleIds', updatedIds);
-  return { removed: articleIds.length - updatedIds.length };
+    await db.set('articleIds', JSON.stringify(updatedIds));
+    return { removed: articleIds.length - updatedIds.length };
+  } catch (error) {
+    console.error(`[DB] Error cleaning old articles:`, error.message);
+    return { removed: 0 };
+  }
 }
 
 export default db;
