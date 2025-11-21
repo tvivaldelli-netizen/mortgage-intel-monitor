@@ -29,11 +29,17 @@ export async function summarizeArticle(title, content) {
       return cleanContent;
     }
 
+    // Check if API key is set
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.log('Claude API key not configured, using fallback summary');
+      return cleanContent.substring(0, 200) + '...';
+    }
+
     // Truncate very long content to reduce token usage
     const truncatedContent = cleanContent.substring(0, 3000);
 
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-20250514',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 300,
       messages: [{
         role: 'user',
