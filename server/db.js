@@ -1,71 +1,32 @@
-import Database from '@replit/database';
-
-const db = new Database();
+// In-memory article storage
+let articles = {};
+let articleIds = [];
 
 /**
- * Store an article in the database
+ * Store an article in memory
  * @param {Object} article - Article object with title, summary, link, source, pubDate
  */
 export async function saveArticle(article) {
-  const articleId = `article:${article.link}`;
+  const articleId = article.link;
 
-  // Clean and limit the data to ensure it can be stored
+  // Clean and limit the data
   const articleData = {
     title: article.title || '',
     link: article.link || '',
     pubDate: article.pubDate || new Date().toISOString(),
     source: article.source || '',
-    summary: (article.summary || '').substring(0, 500),  // Limit summary to 500 chars
-    originalContent: (article.originalContent || '').substring(0, 500),  // Limit content to 500 chars
+    summary: (article.summary || '').substring(0, 500),
+    originalContent: (article.originalContent || '').substring(0, 500),
     savedAt: new Date().toISOString()
   };
 
-  try {
-    await db.set(articleId, JSON.stringify(articleData));
-
-    // Verify the save
-    const verify = await db.get(articleId);
-    if (!verify) {
-      console.error(`[DB] ERROR: Failed to save article ${articleId}`);
-    } else {
-      console.log(`[DB] ✓ Article saved: ${articleId}`);
-    }
-  } catch (error) {
-    console.error(`[DB] Exception saving article ${articleId}:`, error.message);
+  articles[articleId] = articleData;
+  if (!articleIds.includes(articleId)) {
+    articleIds.push(articleId);
   }
 
-  // Also maintain a list of article IDs for efficient retrieval
-  const articleIds = await getArticleIds();
-  if (!articleIds.includes(article.link)) {
-    articleIds.push(article.link);
-    try {
-      await db.set('articleIds', JSON.stringify(articleIds));
-      console.log(`[DB] Updated article list (${articleIds.length} articles)`);
-    } catch (error) {
-      console.error(`[DB] Error updating article list:`, error.message);
-    }
-  }
-
+  console.log(`[DB] ✓ Article saved: ${article.title.substring(0, 50)}`);
   return articleData;
-}
-
-/**
- * Get list of all article IDs
- */
-async function getArticleIds() {
-  try {
-    const idsJson = await db.get('articleIds');
-    if (!idsJson) return [];
-    
-    // Handle both string and already-parsed formats
-    if (typeof idsJson === 'string') {
-      return JSON.parse(idsJson);
-    }
-    return Array.isArray(idsJson) ? idsJson : [];
-  } catch (error) {
-    console.error(`[DB] Error retrieving article IDs:`, error.message);
-    return [];
-  }
 }
 
 /**
@@ -74,23 +35,8 @@ async function getArticleIds() {
  */
 export async function getArticles(filters = {}) {
   try {
-    const articleIds = await getArticleIds();
-    const articles = [];
-
-    for (const link of articleIds) {
-      const articleJson = await db.get(`article:${link}`);
-      if (articleJson) {
-        try {
-          // Handle both string and already-parsed formats
-          const article = typeof articleJson === 'string' ? JSON.parse(articleJson) : articleJson;
-          articles.push(article);
-        } catch (error) {
-          console.error(`[DB] Error parsing article ${link}:`, error.message);
-        }
-      }
-    }
-
-    let filtered = articles;
+    const articleList = Object.values(articles);
+    let filtered = articleList;
 
     // Apply filters
     if (filters.source) {
@@ -120,6 +66,7 @@ export async function getArticles(filters = {}) {
     // Sort by date, newest first
     filtered.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
 
+    console.log(`[DB] Retrieved ${filtered.length} articles`);
     return filtered;
   } catch (error) {
     console.error(`[DB] Error retrieving articles:`, error.message);
@@ -132,34 +79,28 @@ export async function getArticles(filters = {}) {
  */
 export async function cleanOldArticles() {
   try {
-    const articleIds = await getArticleIds();
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-    const updatedIds = [];
+    const beforeCount = Object.keys(articles).length;
+    const keysToDelete = [];
 
-    for (const link of articleIds) {
-      const articleJson = await db.get(`article:${link}`);
-      if (articleJson) {
-        try {
-          const article = typeof articleJson === 'string' ? JSON.parse(articleJson) : articleJson;
-          if (new Date(article.pubDate) >= ninetyDaysAgo) {
-            updatedIds.push(link);
-          } else {
-            await db.delete(`article:${link}`);
-          }
-        } catch (error) {
-          console.error(`[DB] Error processing article ${link}:`, error.message);
-        }
+    for (const [key, article] of Object.entries(articles)) {
+      if (new Date(article.pubDate) < ninetyDaysAgo) {
+        keysToDelete.push(key);
       }
     }
 
-    await db.set('articleIds', JSON.stringify(updatedIds));
-    return { removed: articleIds.length - updatedIds.length };
+    keysToDelete.forEach(key => delete articles[key]);
+    articleIds = articleIds.filter(id => !keysToDelete.includes(id));
+
+    const removed = keysToDelete.length;
+    console.log(`[DB] Cleaned ${removed} old articles`);
+    return { removed };
   } catch (error) {
     console.error(`[DB] Error cleaning old articles:`, error.message);
     return { removed: 0 };
   }
 }
 
-export default db;
+export default { saveArticle, getArticles, cleanOldArticles };
