@@ -83,9 +83,19 @@ Request for insights
 └─────────────────────────────┘
 ```
 
-- **24-hour TTL**: Limits API calls to 1/day per category
+- **Same-day check (EST)**: Only generates new insights if none exist for today
 - **Persistent caching**: Database archive survives server restarts
-- **1-hour dedup**: Prevents duplicate archives within same hour
+- **On-demand generation**: If server was asleep (Replit), insights generate on first user visit
+- **Deduplication**: Startup cleanup ensures one entry per category per day
+- **UPSERT logic**: Updates existing entries instead of creating duplicates (prevents race conditions)
+
+## Archive Behavior
+
+- **Historical only**: Archive page shows insights from previous days only (not today's)
+- **Current insights**: Today's insights are displayed on the main Dashboard
+- **Expand/collapse**: Archive cards show TL;DR by default, with expandable full insights
+- **Category filtering**: Filter archive by Mortgage, Product Management, or All
+- **Date filtering**: Filter by specific date using date picker
 
 ## RSS Sources
 
@@ -121,3 +131,51 @@ Request for insights
 ## Skills
 
 When asked to iterate on UI/design, do multiple design passes, or refine visual components, read and follow `.claude/skills/design-iterator/SKILL.md`.
+
+## Future Roadmap
+
+### Competitor Intelligence Integration
+
+Track all competitor segments across all intelligence types.
+
+#### Phase 1: Competitor News Category (Quick Win)
+Add competitor-focused RSS sources to existing infrastructure:
+
+**Sources to Add** (`sources.json`):
+- **Industry Coverage**: HousingWire, National Mortgage News already cover competitor moves
+- **Company Newsrooms**: Rocket Mortgage, UWM, loanDepot press releases
+- **Fintech News**: TechCrunch Fintech, Finextra for Better, Blend, Figure coverage
+- **Business Intelligence**: Crunchbase News (funding, M&A)
+
+**Changes**:
+1. Add new sources with `category: "competitor-intel"`
+2. Create competitor-specific AI prompt to extract:
+   - Which competitor is mentioned
+   - Type of move (product, business, tech, positioning)
+   - Competitive implications for Freedom Mortgage
+3. Add "Competitor Intel" domain tab alongside Mortgage and Product Management
+
+#### Phase 2: Enhanced Insights (Medium Term)
+Modify `insightsGenerator.js` to:
+- Tag insights with competitor names mentioned
+- Add "Competitive Implications" section to themes
+- Generate "Competitor Watch" TL;DR bullets
+
+#### Phase 3: Dedicated Competitor Dashboard (Future)
+- Competitor profiles with activity timeline
+- Side-by-side feature comparisons
+- Alert system for major competitor moves
+
+#### Files to Modify (Phase 1)
+
+| File | Changes |
+|------|---------|
+| `server/sources.json` | Add competitor news sources |
+| `server/insightsGenerator.js` | Add competitor-focused prompt variant |
+| `client/src/components/Dashboard.jsx` | Add Competitor Intel category tab |
+
+#### Competitors to Track
+
+**Top 5 Lenders**: Rocket Mortgage, United Wholesale Mortgage, loanDepot, PennyMac, Mr. Cooper
+
+**Fintech Disruptors**: Better, Blend, Figure, Beeline, Tomo, Morty
