@@ -125,7 +125,11 @@ File: `server/data/signal-archive.jsonl` — one JSON object per line, append-on
 
 The app runs on Replit Autoscale, which scales to zero when idle. An internal cron job won't work because the server is asleep at trigger time. Instead, **cron-job.org** sends a GET request to `/run-digest?token=` at 10:30 UTC (6:30 AM ET) daily, which wakes the instance and runs the pipeline.
 
+**Important:** The `/run-digest` endpoint uses chunked streaming responses with 10-second keep-alive writes to prevent Replit Autoscale from scaling to zero before the pipeline completes. cron-job.org has a 30-second max timeout, so the response must start immediately — the keep-alive pattern ensures the instance stays alive for the full pipeline duration (~40-120s) even after cron-job.org disconnects.
+
 **Deployment URL:** `https://mortgage-intel-hub.replit.app`
+
+**Deployment Note:** Pushing to GitHub does not auto-deploy. Changes must be manually deployed via the Replit UI.
 
 ## Skills
 
