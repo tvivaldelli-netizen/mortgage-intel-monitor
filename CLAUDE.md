@@ -25,7 +25,7 @@ AI-powered daily email digest of mortgage industry intelligence for product lead
 │    Claude Sonnet 4.5 (insights) + Resend (email)            │
 ├─────────────────────────────────────────────────────────────┤
 │                     Server (Replit Autoscale)                 │
-│    Express.js — GET /health + GET /run-digest                │
+│  Express.js — /health + /run-digest + /read/:id             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -48,8 +48,10 @@ AI-powered daily email digest of mortgage industry intelligence for product lead
 
 ### `articles` table
 Stores fetched RSS articles (cleaned after 90 days)
-- `id`, `title`, `link`, `source`, `category`, `type`, `summary`, `original_content`, `image_url`, `pub_date`
+- `id`, `title`, `link`, `source`, `category`, `type`, `summary`, `original_content`, `image_url`, `pub_date`, `content_html`, `has_full_content`
 - `type` field: `'article'` (default) or `'youtube'`
+- `content_html`: sanitized HTML for reader rendering (NULL for short/scraped articles)
+- `has_full_content`: boolean flag — `true` when RSS provides full article text (e.g. HousingWire). Used to route email links through `/read/:id` instead of original URL
 
 ### Digest Archive (JSONL)
 File: `server/data/signal-archive.jsonl` — one JSON object per line, append-only
@@ -109,6 +111,7 @@ File: `server/data/signal-archive.jsonl` — one JSON object per line, append-on
 |--------|----------|---------|
 | GET | `/health` | Returns digest pipeline state (lastDigestRun, articleCount, emailStatus, nextScheduledRun) |
 | GET | `/run-digest?token=` | Token-protected trigger for daily digest pipeline (called by cron-job.org) |
+| GET | `/read/:id` | Reader endpoint — renders full article content in a clean, newspaper-style page. Used for articles with `has_full_content=true` to bypass paywalls (e.g. HousingWire). Falls back to plain text when no HTML available. |
 
 ## Environment Variables
 
